@@ -12,11 +12,7 @@ classdef ConstantBC < NodalBC
     end
     
     function c = computeNodalConstraint(this, n)
-      c = this.u-this.value;
-    end
-    
-    function gc = computeNodalConstraintGradient(this, n)
-      gc = 1;
+      c = this.value;
     end
     
   end

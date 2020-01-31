@@ -1,14 +1,13 @@
-classdef (Abstract) Kernel < handle
+classdef (Abstract) Material < handle
   
   properties
     problem;
+    data;
     
     var_ids;
     values;
     gradients;
     
-    i;
-    j;
     qp;
     
     elem;
@@ -16,8 +15,9 @@ classdef (Abstract) Kernel < handle
   
   methods
     
-    function this = Kernel(problem)
+    function this = Material(problem)
       this.problem = problem;
+      this.data = cell(1, length(problem.mesh.elems));
       
       this.values = containers.Map('KeyType', 'uint32', 'ValueType', 'any');
       this.gradients = containers.Map('KeyType', 'uint32', 'ValueType', 'any');
@@ -69,52 +69,20 @@ classdef (Abstract) Kernel < handle
       end
     end
     
-    function computeObjective(this)
+    function computeMaterial(this)
+      c = cell(1, length(this.elem.q_points));
       for qp_ = 1:length(this.elem.q_points)
         this.qp = qp_;
-        this.problem.objective = this.problem.objective+this.elem.JxW(qp_)*this.computeQpObjective();
+        c{qp_} = this.computeQpMaterial();
       end
-    end
-    
-    function computeGradient(this)
-      for qp_ = 1:length(this.elem.q_points)
-        this.qp = qp_;
-        for i_ = 1:length(this.elem.nodes)
-          this.i = i_;
-          for ivar = this.var_ids
-            dof = this.problem.globalDoF(this.elem.nodes(i_), ivar);
-            this.problem.gradient(dof) = this.problem.gradient(dof)+this.elem.JxW(qp_)*this.computeQpGradient(ivar);
-          end
-        end
-      end
-    end
-    
-    function computeHessian(this)
-      for qp_ = 1:length(this.elem.q_points)
-        this.qp = qp_;
-        for i_ = 1:length(this.elem.nodes)
-          this.i = i_;
-          for ivar = this.var_ids
-            dof_i = this.problem.globalDoF(this.elem.nodes(i_), ivar);
-            for j_ = 1:length(this.elem.nodes)
-              this.j = j_;
-              for jvar = this.var_ids
-                dof_j = this.problem.globalDoF(this.elem.nodes(j_), jvar);
-                this.problem.hessian(dof_i, dof_j) = this.problem.hessian(dof_i, dof_j)+this.elem.JxW(qp_)*this.computeQpHessian(ivar, jvar);
-              end
-            end
-          end
-        end
-      end
+      this.data{this.elem.id} = c;
     end
     
   end
   
   methods (Abstract)
     
-    computeQpGradient(this, ivar)
-    
-    computeQpHessian(this, ivar, jvar)
+    computeQpMaterial(this)
     
   end
   

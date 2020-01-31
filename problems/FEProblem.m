@@ -13,8 +13,9 @@ classdef FEProblem < handle
     gradient;
     hessian;
     
-    constraint;
-    constraint_gradient;
+    % subject to Aeq * x = Beq
+    Aeq;
+    Beq;
   end
   
   methods
@@ -24,6 +25,22 @@ classdef FEProblem < handle
       this.materials = containers.Map();
       this.kernels = {};
       this.integrated_bcs = {};
+    end
+    
+    function x = solve(this)
+      f = @(x) this.computeObjective(x);
+      H = @(x, lambda) this.computeHessian(x);
+      
+      options = optimoptions(@fmincon,...
+        'Algorithm', 'interior-point',...
+        'SpecifyObjectiveGradient', true,...
+        'SpecifyConstraintGradient', true,...
+        'HessianFcn', H,...
+        'Display', 'iter');
+      
+      this.computeLinearConstraints();
+      
+      x = fmincon(f, this.solution, [], [], this.Aeq, this.Beq, [], [], [], options);
     end
     
     function setMesh(this, mesh)
@@ -56,11 +73,8 @@ classdef FEProblem < handle
       this.solution = zeros(num_nodes*num_vars, 1);
       this.gradient = zeros(num_nodes*num_vars, 1);
       this.hessian = zeros(num_nodes*num_vars);
-      this.constraint_gradient = zeros(num_nodes*num_vars);
-      this.constraint = zeros(num_nodes*num_vars, 1);
-      for m = this.materials.values()
-        m.setup(this);
-      end
+      this.Aeq = zeros(num_nodes*num_vars);
+      this.Beq = zeros(num_nodes*num_vars, 1);
     end
     
     function id = getVariableId(this, variable)
@@ -79,6 +93,12 @@ classdef FEProblem < handle
     function computeMaterials(this, x)
       if norm(x-this.solution) > 0
         this.solution = x;
+        for e = this.mesh.elems
+          for m = this.materials.values()
+            m{1}.reinitElem(e);
+            m{1}.computeMaterial();
+          end
+        end
       end
     end
     
@@ -159,12 +179,9 @@ classdef FEProblem < handle
       H = sparse(this.hessian);
     end
     
-    function [C, Ceq, GC, GCeq] = computeConstraint(this, x)
-      this.computeMaterials(x);
-      C = [];
-      GC = [];
-      this.constraint = this.constraint*0;
-      this.constraint_gradient = this.constraint_gradient*0;
+    function computeLinearConstraints(this)
+      this.Aeq = this.Aeq*0;
+      this.Beq = this.Beq*0;
       
       % nodal bcs over node sets
       for boundary = this.mesh.node_sets.keys()
@@ -175,14 +192,10 @@ classdef FEProblem < handle
                 continue
               end
               this.nodal_bcs{i}.computeConstraint();
-              this.nodal_bcs{i}.computeConstraintGradient();
             end
           end
         end
       end
-      
-      Ceq = sparse(this.constraint);
-      GCeq = sparse(this.constraint_gradient);
     end
     
   end
