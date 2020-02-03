@@ -34,19 +34,20 @@ p.addMaterial('2 g', Degradation(p, '1 d', '1 M', '1 psic', 1));
 p.addVariable('u');
 p.addVariable('p');
 
-p.setup();
-
 p.addKernel(MatDiffusion(p, 'u', '2 g'));
-% p.addKernel(Contact(p, 'u', '2 g', '1 grad_d'));
-p.addKernel(CoupledPressure(p, 'u', 'p', '1 grad_d'));
-p.addKernel(PenaltyContact(p, 'u', 'p', '2 g', 1));
+p.addKernel(Diffusion(p, 'p'));
+% p.addKernel(CoupledPressure(p, 'u', 'p', '1 grad_d'));
 
 p.addNodalBC(ConstantBC(p, 'left', 'u', 0));
 p.addNodalBC(ConstantBC(p, 'right', 'u', 1));
-p.addNodalBC(ConstantBC(p, 'left', 'p', 0));
-p.addNodalBC(ConstantBC(p, 'right', 'p', 0));
+p.addNodalBC(ConstantBC(p, 'left', 'p', -1));
+p.addNodalBC(ConstantBC(p, 'right', 'p', -1));
+
+p.addEqualityConstraint(ConstantConstraint(p, 'p', -1));
+% p.addEqualityConstraint(ContactConstraint(p, 'p', 'u', '2 g'));
 
 % p.setUpperBound('p', 0);
+p.setup();
  
 x = p.solve();
 

@@ -13,13 +13,18 @@ classdef ConstantConstraint < EqualityConstraint
       this.value = value;
     end
     
-    function g = computeQpConstraint(this, ivar)
+    function value = computeQpConstraint(this)
       u = this.values(this.var_id);
-      g = this.elem.test(this.i, this.qp)*(u(this.qp)-this.value);
+      value = 0.5*(u(this.qp)-this.value)^2;
     end
     
-    function h = computeQpConstraintGradient(this, ivar, jvar)
-      h = this.elem.test(this.i, this.qp)*this.elem.test(this.j, this.qp);
+    function value = computeQpConstraintGradient(this, ivar)
+      u = this.values(this.var_id);
+      value = this.elem.test(this.i, this.qp)*(u(this.qp)-this.value);
+    end
+    
+    function value = computeQpConstraintHessian(this, ivar, jvar)
+      value = this.elem.test(this.i, this.qp)*this.elem.test(this.j, this.qp);
     end
     
   end

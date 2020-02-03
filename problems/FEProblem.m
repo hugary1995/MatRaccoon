@@ -22,13 +22,12 @@ classdef FEProblem < handle
     Ceq;
     GCeq;
     
-    % subject to C(x) <= 0
-    C;
-    GC;
-    
     % subject to lb <= x <= ub
     lb;
     ub;
+    
+    % lagrange multiplier
+    lambda;
   end
   
   methods
@@ -42,7 +41,7 @@ classdef FEProblem < handle
     
     function x = solve(this)
       f = @(x) this.computeObjective(x);
-      H = @(x, lambda) this.computeHessian(x);
+      H = @(x, lambda) this.computeHessian(x, lambda);
       nonlcon = @(x) this.computeNonlinearConstraints(x);
       
       options = optimoptions(@fmincon,...
@@ -52,7 +51,8 @@ classdef FEProblem < handle
         'HessianFcn', H,...
         'Display', 'iter',...
         'CheckGradients', false,...
-        'ConstraintTolerance', 1e-6);
+        'ConstraintTolerance', 1e-6,...
+        'HonorBounds', false);
       
       this.computeLinearConstraints();
       
@@ -125,12 +125,17 @@ classdef FEProblem < handle
       this.hessian = zeros(num_nodes*num_vars);
       this.Beq = zeros(num_nodes*num_vars, 1);
       this.Aeq = zeros(num_nodes*num_vars);
-      this.Ceq = zeros(num_nodes*num_vars, 1);
-      this.GCeq = zeros(num_nodes*num_vars);
-      this.C = zeros(num_nodes*num_vars, 1);
-      this.GC = zeros(num_nodes*num_vars);
       this.lb = -inf(num_nodes*num_vars, 1);
       this.ub = inf(num_nodes*num_vars, 1);
+      
+      if ~isempty(this.constraints_eq)
+        this.Ceq = 0;
+        this.GCeq = zeros(num_nodes*num_vars, 1);
+      else
+        this.Ceq = [];
+        this.GCeq = [];
+      end
+      
       for e = this.mesh.elems
         for m = this.materials.values()
           m{1}.reinitElem(e);
@@ -164,11 +169,10 @@ classdef FEProblem < handle
       end
     end
     
-    function [f, g, H] = computeObjective(this, x)
+    function [f, g] = computeObjective(this, x)
       this.computeMaterials(x);
       this.objective = 0;
       this.gradient = this.gradient*0;
-      this.hessian = this.hessian*0;
       
       for e = this.mesh.elems
         for i = 1:length(this.kernels)
@@ -176,9 +180,6 @@ classdef FEProblem < handle
           this.kernels{i}.computeObjective();
           if nargout > 1
             this.kernels{i}.computeGradient();
-            if nargout > 2
-              this.kernels{i}.computeHessian();
-            end
           end
         end
       end
@@ -195,9 +196,6 @@ classdef FEProblem < handle
               this.integrated_bcs{i}.computeObjective();
               if nargout > 1
                 this.integrated_bcs{i}.computeGradient();
-                if nargout > 2
-                  this.integrated_bcs{i}.computeHessian();
-                end
               end
             end
           end
@@ -208,12 +206,10 @@ classdef FEProblem < handle
       if nargout > 1
         g = sparse(this.gradient);
       end
-      if nargout > 2
-        H = sparse(this.hessian);
-      end
     end
     
-    function H = computeHessian(this, x)
+    function H = computeHessian(this, x, lambda)
+      this.lambda = lambda.eqnonlin;
       this.computeMaterials(x);
       this.hessian = this.hessian*0;
       
@@ -221,6 +217,10 @@ classdef FEProblem < handle
         for i = 1:length(this.kernels)
           this.kernels{i}.reinitElem(e);
           this.kernels{i}.computeHessian();
+        end
+        for i = 1:length(this.constraints_eq)
+          this.constraints_eq{i}.reinitElem(e);
+          this.constraints_eq{i}.computeConstraintHessian();
         end
       end
       
@@ -265,8 +265,6 @@ classdef FEProblem < handle
       
       this.Ceq = this.Ceq*0;
       this.GCeq = this.GCeq*0;
-      this.C = this.C*0;
-      this.GC = this.GC*0;
       
       % equality constraints
       for e = this.mesh.elems
@@ -277,8 +275,8 @@ classdef FEProblem < handle
         end
       end
       
-      C = sparse(this.C);
-      GC = sparse(this.GC);
+      C = [];
+      GC = [];
       Ceq = sparse(this.Ceq);
       GCeq = sparse(this.GCeq);
     end

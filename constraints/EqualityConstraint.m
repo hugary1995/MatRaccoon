@@ -72,17 +72,24 @@ classdef (Abstract) EqualityConstraint < handle
     function computeConstraint(this)
       for qp_ = 1:length(this.elem.q_points)
         this.qp = qp_;
+        this.problem.Ceq = this.problem.Ceq+this.elem.JxW(qp_)*this.computeQpConstraint();
+      end
+    end
+    
+    function computeConstraintGradient(this)
+      for qp_ = 1:length(this.elem.q_points)
+        this.qp = qp_;
         for i_ = 1:length(this.elem.nodes)
           this.i = i_;
           for ivar = this.var_ids
             dof = this.problem.globalDoF(this.elem.nodes(i_), ivar);
-            this.problem.Ceq(dof) = this.problem.Ceq(dof)+this.elem.JxW(qp_)*this.computeQpConstraint(ivar);
+            this.problem.GCeq(dof) = this.problem.GCeq(dof)+this.elem.JxW(qp_)*this.computeQpConstraintGradient(ivar);
           end
         end
       end
     end
     
-    function computeConstraintGradient(this)
+    function computeConstraintHessian(this)
       for qp_ = 1:length(this.elem.q_points)
         this.qp = qp_;
         for i_ = 1:length(this.elem.nodes)
@@ -93,7 +100,7 @@ classdef (Abstract) EqualityConstraint < handle
               this.j = j_;
               for jvar = this.var_ids
                 dof_j = this.problem.globalDoF(this.elem.nodes(j_), jvar);
-                this.problem.GCeq(dof_i, dof_j) = this.problem.GCeq(dof_i, dof_j)+this.elem.JxW(qp_)*this.computeQpConstraintGradient(ivar, jvar);
+                this.problem.hessian(dof_i, dof_j) = this.problem.lambda*this.problem.hessian(dof_i, dof_j)+this.elem.JxW(qp_)*this.computeQpConstraintHessian(ivar, jvar);
               end
             end
           end
@@ -105,9 +112,11 @@ classdef (Abstract) EqualityConstraint < handle
   
   methods (Abstract)
     
-    computeQpConstraint(this, ivar)
+    computeQpConstraint(this)
     
-    computeQpConstraintGradient(this, ivar, jvar)
+    computeQpConstraintGradient(this, ivar)
+    
+    computeQpConstraintHessian(this, ivar, jvar)
     
   end
   
