@@ -7,6 +7,7 @@ classdef FEProblem < handle
     kernels;
     nodal_bcs;
     integrated_bcs;
+    constraints_eq;
     
     solution;
     objective;
@@ -14,8 +15,20 @@ classdef FEProblem < handle
     hessian;
     
     % subject to Aeq * x = Beq
-    Aeq;
     Beq;
+    Aeq;
+    
+    % subject to Ceq(x) = 0
+    Ceq;
+    GCeq;
+    
+    % subject to C(x) <= 0
+    C;
+    GC;
+    
+    % subject to lb <= x <= ub
+    lb;
+    ub;
   end
   
   methods
@@ -30,17 +43,34 @@ classdef FEProblem < handle
     function x = solve(this)
       f = @(x) this.computeObjective(x);
       H = @(x, lambda) this.computeHessian(x);
+      nonlcon = @(x) this.computeNonlinearConstraints(x);
       
       options = optimoptions(@fmincon,...
         'Algorithm', 'interior-point',...
         'SpecifyObjectiveGradient', true,...
         'SpecifyConstraintGradient', true,...
         'HessianFcn', H,...
-        'Display', 'iter');
+        'Display', 'iter',...
+        'CheckGradients', false,...
+        'ConstraintTolerance', 1e-6);
       
       this.computeLinearConstraints();
       
-      x = fmincon(f, this.solution, [], [], this.Aeq, this.Beq, [], [], [], options);
+      x = fmincon(f, this.solution, [], [], this.Aeq, this.Beq, this.lb, this.ub, nonlcon, options);
+      this.solution = x;
+    end
+    
+    function plot(this, variable)
+      id = this.getVariableId(variable);
+      x = [];
+      v = [];
+      for n = this.mesh.nodes
+        x = [x, n.x];
+        v = [v, this.solution(this.globalDoF(n, id))];
+      end
+      figure;
+      plot(x, v);
+      title(variable);
     end
     
     function setMesh(this, mesh)
@@ -67,14 +97,46 @@ classdef FEProblem < handle
       this.integrated_bcs{end+1} = bc;
     end
     
+    function addEqualityConstraint(this, constraint)
+      this.constraints_eq{end+1} = constraint;
+    end
+    
+    function setLowerBound(this, variable, value)
+      var_id = this.getVariableId(variable);
+      num_nodes = length(this.mesh.nodes);
+      dof_begin = (var_id-1)*num_nodes+1;
+      dof_end = var_id*num_nodes;
+      this.lb(dof_begin:dof_end) = value;
+    end
+    
+    function setUpperBound(this, variable, value)
+      var_id = this.getVariableId(variable);
+      num_nodes = length(this.mesh.nodes);
+      dof_begin = (var_id-1)*num_nodes+1;
+      dof_end = var_id*num_nodes;
+      this.ub(dof_begin:dof_end) = value;
+    end
+    
     function setup(this)
       num_nodes = length(this.mesh.nodes);
       num_vars = length(this.variables);
       this.solution = zeros(num_nodes*num_vars, 1);
       this.gradient = zeros(num_nodes*num_vars, 1);
       this.hessian = zeros(num_nodes*num_vars);
-      this.Aeq = zeros(num_nodes*num_vars);
       this.Beq = zeros(num_nodes*num_vars, 1);
+      this.Aeq = zeros(num_nodes*num_vars);
+      this.Ceq = zeros(num_nodes*num_vars, 1);
+      this.GCeq = zeros(num_nodes*num_vars);
+      this.C = zeros(num_nodes*num_vars, 1);
+      this.GC = zeros(num_nodes*num_vars);
+      this.lb = -inf(num_nodes*num_vars, 1);
+      this.ub = inf(num_nodes*num_vars, 1);
+      for e = this.mesh.elems
+        for m = this.materials.values()
+          m{1}.reinitElem(e);
+          m{1}.computeMaterial();
+        end
+      end
     end
     
     function id = getVariableId(this, variable)
@@ -196,6 +258,29 @@ classdef FEProblem < handle
           end
         end
       end
+    end
+    
+    function [C, Ceq, GC, GCeq] = computeNonlinearConstraints(this, x)
+      this.computeMaterials(x);
+      
+      this.Ceq = this.Ceq*0;
+      this.GCeq = this.GCeq*0;
+      this.C = this.C*0;
+      this.GC = this.GC*0;
+      
+      % equality constraints
+      for e = this.mesh.elems
+        for i = 1:length(this.constraints_eq)
+          this.constraints_eq{i}.reinitElem(e);
+          this.constraints_eq{i}.computeConstraint();
+          this.constraints_eq{i}.computeConstraintGradient();
+        end
+      end
+      
+      C = sparse(this.C);
+      GC = sparse(this.GC);
+      Ceq = sparse(this.Ceq);
+      GCeq = sparse(this.GCeq);
     end
     
   end
