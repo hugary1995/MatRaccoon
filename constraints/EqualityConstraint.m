@@ -100,7 +100,7 @@ classdef (Abstract) EqualityConstraint < handle
               this.j = j_;
               for jvar = this.var_ids
                 dof_j = this.problem.globalDoF(this.elem.nodes(j_), jvar);
-                this.problem.hessian(dof_i, dof_j) = this.problem.lambda*this.problem.hessian(dof_i, dof_j)+this.elem.JxW(qp_)*this.computeQpConstraintHessian(ivar, jvar);
+                this.problem.hessian(dof_i, dof_j) = this.problem.hessian(dof_i, dof_j)+this.problem.lambda*this.elem.JxW(qp_)*this.computeQpConstraintHessian(ivar, jvar);
               end
             end
           end

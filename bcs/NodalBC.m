@@ -25,6 +25,21 @@ classdef (Abstract) NodalBC < handle
       end
     end
     
+    function modifyGradient(this)
+      for i = 1:length(this.node_set)
+        dof = this.problem.globalDoF(this.node_set(i), this.var_id);
+        this.problem.gradient(dof) = -this.computeNodalConstraint(this.node_set(i));
+      end
+    end
+    
+    function modifyHessian(this)
+      for i = 1:length(this.node_set)
+        dof = this.problem.globalDoF(this.node_set(i), this.var_id);
+        this.problem.hessian(dof, :) = 0;
+        this.problem.hessian(dof, dof) = 1;
+      end
+    end
+    
   end
   
   methods (Abstract)

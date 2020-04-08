@@ -12,7 +12,7 @@ addpath('./materials/');
 addpath('./constraints/');
 
 L = 1;
-nx = 100;
+nx = 10;
 
 Gc = 2.7;
 l = 0.025;
@@ -34,20 +34,26 @@ p.addMaterial('2 g', Degradation(p, '1 d', '1 M', '1 psic', 1));
 p.addVariable('u');
 p.addVariable('p');
 
+% p.addKernel(Source(p, 'u', @(x, y) x));
+% p.addKernel(Diffusion(p, 'u'));
+% p.addKernel(Reaction(p, 'u'));
 p.addKernel(MatDiffusion(p, 'u', '2 g'));
-p.addKernel(Diffusion(p, 'p'));
+% p.addKernel(Diffusion(p, 'p'));
 % p.addKernel(CoupledPressure(p, 'u', 'p', '1 grad_d'));
 
 p.addNodalBC(ConstantBC(p, 'left', 'u', 0));
-p.addNodalBC(ConstantBC(p, 'right', 'u', 1));
-p.addNodalBC(ConstantBC(p, 'left', 'p', -1));
-p.addNodalBC(ConstantBC(p, 'right', 'p', -1));
+p.addNodalBC(ConstantBC(p, 'right', 'u', -1));
+% p.addNodalBC(ConstantBC(p, 'left', 'p', -1));
+% p.addNodalBC(ConstantBC(p, 'right', 'p', -1));
 
-p.addEqualityConstraint(ConstantConstraint(p, 'p', -1));
+% p.addEqualityConstraint(ConstantConstraint(p, 'p', -1));
+% p.addEqualityConstraint(CoupledValueConstraint(p, 'p', 'u'));
+p.addEqualityConstraint(CoupledGradientConstraint(p, 'p', 'u'));
+% p.addEqualityConstraint(EqualGradientConstraint(p, 'p', 'u'));
 % p.addEqualityConstraint(ContactConstraint(p, 'p', 'u', '2 g'));
 
-% p.setUpperBound('p', 0);
 p.setup();
+% p.setUpperBound('p', 0);
  
 x = p.solve();
 

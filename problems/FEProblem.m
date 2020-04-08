@@ -51,8 +51,8 @@ classdef FEProblem < handle
         'HessianFcn', H,...
         'Display', 'iter',...
         'CheckGradients', false,...
-        'ConstraintTolerance', 1e-6,...
-        'HonorBounds', false);
+        'HonorBounds', true,...
+        'OptimalityTolerance', 1e-6);
       
       this.computeLinearConstraints();
       
@@ -209,7 +209,6 @@ classdef FEProblem < handle
     end
     
     function H = computeHessian(this, x, lambda)
-      this.lambda = lambda.eqnonlin;
       this.computeMaterials(x);
       this.hessian = this.hessian*0;
       
@@ -219,6 +218,7 @@ classdef FEProblem < handle
           this.kernels{i}.computeHessian();
         end
         for i = 1:length(this.constraints_eq)
+          this.lambda = lambda.eqnonlin(i);
           this.constraints_eq{i}.reinitElem(e);
           this.constraints_eq{i}.computeConstraintHessian();
         end
@@ -271,14 +271,18 @@ classdef FEProblem < handle
         for i = 1:length(this.constraints_eq)
           this.constraints_eq{i}.reinitElem(e);
           this.constraints_eq{i}.computeConstraint();
-          this.constraints_eq{i}.computeConstraintGradient();
+          if nargout > 2
+            this.constraints_eq{i}.computeConstraintGradient();
+          end
         end
       end
       
       C = [];
       GC = [];
       Ceq = sparse(this.Ceq);
-      GCeq = sparse(this.GCeq);
+      if nargout > 2
+        GCeq = sparse(this.GCeq);
+      end
     end
     
   end

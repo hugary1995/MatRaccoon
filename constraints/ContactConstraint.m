@@ -34,6 +34,7 @@ classdef ContactConstraint < EqualityConstraint
         value = test*(p(this.qp)-(1-g)*grad_u(this.qp).x);
       elseif ivar == this.u_var_id
         value = -grad_test.x*(1-g)*(p(this.qp)-(1-g)*grad_u(this.qp).x);
+        %                 value = 0;
       end
     end
     
@@ -48,10 +49,13 @@ classdef ContactConstraint < EqualityConstraint
         value = test_i*test_j;
       elseif ivar == this.p_var_id && jvar == this.u_var_id
         value = -test_i*(1-g)*grad_test_j.x;
+        %                 value = 0;
       elseif ivar == this.u_var_id && jvar == this.p_var_id
         value = -grad_test_i.x*(1-g)*test_j;
+        %                 value = 0;
       elseif ivar == this.u_var_id && jvar == this.u_var_id
         value = grad_test_i.x*(1-g)^2*grad_test_j.x;
+        %                 value = 0;
       end
     end
     
